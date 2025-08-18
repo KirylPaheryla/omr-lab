@@ -1,0 +1,5 @@
+metrics:
+  symbols: ["precision", "recall", "f1"]
+  notes: ["pitch_acc", "rhythm_acc"]
+  midi: ["onset_f1", "pitch_f1"]
+  text: ["cer", "wer", "alignment_acc"]
