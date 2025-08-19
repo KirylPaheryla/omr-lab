@@ -8,6 +8,8 @@ from omr_lab.common.config import AppConfig, load_yaml
 from omr_lab.common.logging import log, setup_logging
 from omr_lab.common.runctx import RunContext
 from omr_lab.data.normalize import normalize_folder
+from omr_lab.data.qa import qa_coco
+from omr_lab.data.render import render_dataset
 from omr_lab.data.split import stratified_split
 from omr_lab.data.synth import synth_batch
 from omr_lab.eval.compare import compare_runs
@@ -41,7 +43,7 @@ OPT_OUT_SUMMARY = typer.Option(Path("experiments/reports/summary"), help="Output
 ARG_SOURCE = typer.Argument(..., help="Folder with metrics to summarize into a report.")
 OPT_OUT_FINAL = typer.Option(Path("experiments/reports/final"), help="Output folder.")
 
-# New parameters for data commands
+# data-* aliases
 ARG_MXL_IN = typer.Argument(..., help="Folder with MusicXML files.")
 ARG_IR_OUT = typer.Argument(..., help="Folder to write IR JSON.")
 OPT_SYNTH_OUT = typer.Option(
@@ -51,6 +53,25 @@ OPT_SYNTH_N = typer.Option(10, "--n", "-n", help="How many synthetic scores to g
 OPT_SPLIT_OUT = typer.Option(
     Path("data/splits"), "--out", "--out-dir", "-o", help="Output folder for split files."
 )
+
+# QA params (avoid B008 by hoisting Typer objects)
+ARG_COCO_PATH = typer.Argument(..., help="Path to COCO JSON (from data-render).")
+OPT_PAGES_CSV = typer.Option(None, "--pages", help="Optional pages.csv for has_lyrics stats.")
+
+# render/qa
+OPT_RENDER_IMG_DIR = typer.Option(
+    Path("data/images"), "--images", "-I", help="Where to store rendered page images."
+)
+OPT_RENDER_ANN_DIR = typer.Option(
+    Path("data/annotations_pix"), "--ann-out", "-A", help="Where to store COCO/CSV annotations."
+)
+OPT_RENDER_MUSESCORE = typer.Option(
+    None, "--musescore-cmd", help="Path to MuseScore CLI executable (e.g. MuseScore4.exe)."
+)
+OPT_RENDER_VEROVIO = typer.Option(
+    None, "--verovio-cmd", help="Path to Verovio CLI executable (e.g. verovio)."
+)
+OPT_RENDER_DPI = typer.Option(300, "--dpi", "-r", help="PNG DPI for MuseScore renderer.")
 # --------------------------------------------------------------
 
 
@@ -67,6 +88,7 @@ def prepare_data(
     output_path: Path = ARG_OUTPUT_PROCESSED,
     dpi: int = OPT_DPI,
 ) -> None:
+    """Prepare dataset: copy/convert raw input into processed format."""
     from omr_lab.common.logging import add_file_logging
 
     add_file_logging(output_path / "logs" / "prepare.jsonl")
@@ -80,6 +102,7 @@ def data_normalize(
     musicxml_dir: Path = ARG_MXL_IN,
     ir_out: Path = ARG_IR_OUT,
 ) -> None:
+    """Normalize MusicXML files into intermediate representation (IR)."""
     from omr_lab.common.logging import add_file_logging
 
     add_file_logging(ir_out / "logs" / "normalize.jsonl")
@@ -93,6 +116,7 @@ def data_synth(
     out_dir: Path = OPT_SYNTH_OUT,
     n: int = OPT_SYNTH_N,
 ) -> None:
+    """Generate synthetic MusicXML scores."""
     from omr_lab.common.logging import add_file_logging
 
     add_file_logging(out_dir / "logs" / "synth.jsonl")
@@ -106,12 +130,58 @@ def data_split(
     ir_dir: Path = ARG_IR_OUT,
     out_dir: Path = OPT_SPLIT_OUT,
 ) -> None:
+    """Split dataset into train/val/test subsets using stratification."""
     from omr_lab.common.logging import add_file_logging
 
     add_file_logging(out_dir / "logs" / "split.jsonl")
     log.info("split_start", ir=str(ir_dir), out=str(out_dir))
     stratified_split(ir_dir, out_dir)
     log.info("split_done", out=str(out_dir))
+
+
+@app.command("data-render")
+def data_render(
+    musicxml_dir: Path = ARG_MXL_IN,
+    images_out: Path = OPT_RENDER_IMG_DIR,
+    ann_out: Path = OPT_RENDER_ANN_DIR,
+    musescore_cmd: str | None = OPT_RENDER_MUSESCORE,
+    verovio_cmd: str | None = OPT_RENDER_VEROVIO,
+    dpi: int = OPT_RENDER_DPI,
+) -> None:
+    """
+    Render page images (MuseScore) and SVG (Verovio), collect COCO + pages.csv + links.csv.
+    Requires CLI tools installed:
+      - MuseScore CLI: see official docs (exporting PNG options).
+      - Verovio CLI: see Verovio Reference Book (command-line / toolkit options).
+    """
+    from omr_lab.common.logging import add_file_logging
+
+    add_file_logging(ann_out / "logs" / "render.jsonl")
+    coco_path, pages_csv = render_dataset(
+        input_dir=musicxml_dir,
+        out_images=images_out,
+        out_ann_dir=ann_out,
+        musescore_cmd=musescore_cmd,
+        verovio_cmd=verovio_cmd,
+        dpi=dpi,
+    )
+    log.info("render_done", coco=str(coco_path), pages=str(pages_csv))
+
+
+@app.command("data-qa")
+def data_qa(
+    coco_path: Path = ARG_COCO_PATH,
+    pages_csv: Path | None = OPT_PAGES_CSV,
+) -> None:
+    """Run QA checks on dataset (COCO + optional pages.csv)."""
+    from omr_lab.common.logging import add_file_logging
+
+    add_file_logging(coco_path.parent / "logs" / "qa.jsonl")
+    rep = qa_coco(coco_path, pages_csv)
+    typer.echo(
+        f"images={rep.images} annotations={rep.annotations} "
+        f"bbox_coverage={rep.bbox_coverage_pct:.1f}% images_with_lyrics={rep.images_with_lyrics}"
+    )
 
 
 @app.command("run-pipeline")
@@ -121,6 +191,7 @@ def run_pipeline(
     input_path: Path = ARG_INPUT_PATH,
     out: Path = OPT_OUT_RUN,
 ) -> None:
+    """Run a recognition pipeline (rules, hybrid, ai, baseline)."""
     registry = get_registry()
     if impl not in registry:
         raise typer.BadParameter(
@@ -155,6 +226,7 @@ def eval_run(
     config: Path | None = OPT_EVAL_CONFIG,
     out: Path = OPT_OUT_EVAL,
 ) -> None:
+    """Evaluate run predictions vs ground truth annotations."""
     from omr_lab.common.logging import add_file_logging
 
     add_file_logging(out / "logs" / "eval.jsonl")
@@ -170,6 +242,7 @@ def compare(
     metrics: str = OPT_METRICS,
     out: Path = OPT_OUT_SUMMARY,
 ) -> None:
+    """Compare multiple runs by chosen metrics."""
     from omr_lab.common.logging import add_file_logging
 
     add_file_logging(out / "logs" / "compare.jsonl")
@@ -184,6 +257,7 @@ def report(
     source: Path = ARG_SOURCE,
     out: Path = OPT_OUT_FINAL,
 ) -> None:
+    """Build a final evaluation report from metrics summary."""
     from omr_lab.common.logging import add_file_logging
 
     add_file_logging(out / "logs" / "report.jsonl")
