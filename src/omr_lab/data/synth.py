@@ -37,7 +37,7 @@ def _attach_lyrics_to_notes(nlist: list[note.Note], words: list[str]) -> None:
         if i < len(syls):
             s, syl = syls[i]
             lyr = Lyric(text=s)
-            # допустимые значения: "single", "begin", "middle", "end"
+            # allowed values: "single", "begin", "middle", "end"
             lyr.syllabic = syl  # type: ignore[assignment]
             n.lyrics.append(lyr)
 
@@ -52,7 +52,7 @@ def synth_one(out_musicxml: Path, words: list[str] | None = None, measures: int 
     for _m in range(measures):
         for _q in range(4):
             n = note.Note(random.choice(["C4", "D4", "E4", "F4", "G4", "A4", "B4"]))
-            n.duration = duration.Duration(1.0)  # четверть
+            n.duration = duration.Duration(1.0)  # quarter note
             notes.append(n)
             p.append(n)
 

@@ -34,8 +34,8 @@ def _env_info() -> dict[str, Any]:
     pkgs: dict[str, str] = {}
     try:
         for dist in importlib_metadata.distributions():
-            # PackageMetadata у дистрибуции ведёт себя как mapping, но типы mypy консервативны.
-            # Надёжно через try/except, без .get().
+            # PackageMetadata of a distribution behaves like a mapping, but mypy types are conservative.
+            # Use try/except for reliability instead of .get().
             try:
                 name = dist.metadata["Name"]  # type: ignore[index]
             except Exception:
@@ -45,7 +45,7 @@ def _env_info() -> dict[str, Any]:
             version = dist.version or ""
             pkgs[name] = version
     except Exception:
-        # В случае проблем со сбором метаданных просто возвращаем то, что успели собрать.
+        # If collecting metadata fails, just return whatever was gathered.
         pass
 
     return {

@@ -19,8 +19,8 @@ def _get_json_processors() -> list:
 
 def setup_logging(level: int = logging.INFO) -> None:
     """
-    Консольное JSON-логирование (идемпотентно).
-    Для логов в файл вызови add_file_logging().
+    Console JSON logging (idempotent).
+    Call add_file_logging() to log to a file.
     """
     logging.basicConfig(level=level, format="%(message)s")
     structlog.configure(
@@ -32,8 +32,8 @@ def setup_logging(level: int = logging.INFO) -> None:
 
 def add_file_logging(log_file: Path, level: int = logging.INFO) -> None:
     """
-    Подключает RotatingFileHandler, который пишет JSON-строки.
-    Избегаем дублирования по совпадению baseFilename.
+    Attaches a RotatingFileHandler that writes JSON strings.
+    Avoid duplicate handlers by matching baseFilename.
     """
     log_file.parent.mkdir(parents=True, exist_ok=True)
     root_logger = logging.getLogger()

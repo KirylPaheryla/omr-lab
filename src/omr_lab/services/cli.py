@@ -41,7 +41,7 @@ OPT_OUT_SUMMARY = typer.Option(Path("experiments/reports/summary"), help="Output
 ARG_SOURCE = typer.Argument(..., help="Folder with metrics to summarize into a report.")
 OPT_OUT_FINAL = typer.Option(Path("experiments/reports/final"), help="Output folder.")
 
-# Новые параметры для data-команд
+# New parameters for data commands
 ARG_MXL_IN = typer.Argument(..., help="Folder with MusicXML files.")
 ARG_IR_OUT = typer.Argument(..., help="Folder to write IR JSON.")
 OPT_SYNTH_OUT = typer.Option(

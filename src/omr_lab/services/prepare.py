@@ -15,9 +15,9 @@ def prepare_dataset(input_path: Path, output_path: Path) -> int:
 
     items: Iterable[Path]
     if input_path.is_dir():
-        items = input_path.rglob("*")  # iterable из Path
+        items = input_path.rglob("*")  # iterable of Path
     else:
-        items = [input_path]  # список тоже Iterable[Path]
+        items = [input_path]  # list is also Iterable[Path]
 
     for p in items:
         if p.is_file() and p.suffix.lower() in SUPPORTED_EXT:
