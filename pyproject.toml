@@ -31,6 +31,10 @@ isort = "^5.13.2"
 pre-commit = "^3.7.1"
 types-pyyaml = "^6.0.12.20250809"
 
+
+[tool.poetry.group.ai.dependencies]
+torch = {version = "==2.3.*", source = "pypi"}
+
 [tool.poetry.scripts]
 omr = "omr_lab.services.cli:app"
 
