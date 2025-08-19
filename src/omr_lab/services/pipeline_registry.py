@@ -10,7 +10,7 @@ PipelineFn = Callable[[Iterable[Path], Path, AppConfig | None], None]
 def get_registry() -> dict[str, PipelineFn]:
     return {
         "rules": run_rules_pipeline,
-        # "hybrid": run_hybrid_pipeline, # добавим позже
-        # "ai": run_ai_pipeline, # добавим позже
+        # "hybrid": run_hybrid_pipeline, # to be added later
+        # "ai": run_ai_pipeline, # to be added later
         # "baseline": run_baseline_pipeline
     }

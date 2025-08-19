@@ -9,11 +9,11 @@ from omr_lab.common.ir import LyricsToken, MeasureIR, NoteEvent, PartIR, ScoreIR
 
 
 def _coerce_to_score(obj: Any) -> stream.Score:
-    """Приводим результат converter.parse к Score (обрабатываем Opus/Part)."""
+    """Convert the result of converter.parse to Score (handle Opus/Part)."""
     if isinstance(obj, stream.Score):
         return obj
     if isinstance(obj, stream.Opus):
-        # Берём первый Score из Opus (чаще всего один)
+        # Take the first Score from the Opus (often only one)
         if obj.scores:
             return obj.scores[0]
         sc = stream.Score()
@@ -25,7 +25,7 @@ def _coerce_to_score(obj: Any) -> stream.Score:
         sc = stream.Score()
         sc.insert(0, obj)
         return sc
-    # Фоллбек: пытаемся собрать Score из доступных Part
+    # Fallback: try to build a Score from available Parts
     sc = stream.Score()
     parts = getattr(obj, "parts", None)
     if parts:
@@ -66,7 +66,7 @@ def musicxml_to_ir(path: Path) -> ScoreIR:
     for p_idx, p in enumerate(sc.parts):
         measures_ir: list[MeasureIR] = []
         flat: stream.Stream = p.flat  # type: ignore[assignment]
-        # measureNumber может быть None → фильтруем и приводим к int
+        # measureNumber may be None → filter and cast to int
         measure_numbers = sorted(
             {
                 int(mn)
@@ -158,7 +158,7 @@ def normalize_folder(in_dir: Path, out_dir: Path) -> int:
             try:
                 ir = musicxml_to_ir(p)
                 out_path = out_dir / (p.stem + ".json")
-                # Pydantic v2: используем json.dumps(c.dict())
+                # Pydantic v2: use json.dumps(c.dict())
                 out_path.write_text(
                     json.dumps(ir.model_dump(), indent=2, ensure_ascii=False), encoding="utf-8"
                 )
