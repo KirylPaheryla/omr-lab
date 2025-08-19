@@ -25,3 +25,8 @@ Thumbs.db
 data/processed/
 experiments/runs/
 experiments/reports/
+
+# Generated data
+data/synth/
+data/annotations/
+data/splits/

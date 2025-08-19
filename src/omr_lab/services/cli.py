@@ -7,6 +7,9 @@ import typer
 from omr_lab.common.config import AppConfig, load_yaml
 from omr_lab.common.logging import log, setup_logging
 from omr_lab.common.runctx import RunContext
+from omr_lab.data.normalize import normalize_folder
+from omr_lab.data.split import stratified_split
+from omr_lab.data.synth import synth_batch
 from omr_lab.eval.compare import compare_runs
 from omr_lab.eval.filelevel import eval_filelevel
 from omr_lab.eval.report import build_report
@@ -15,7 +18,6 @@ from omr_lab.services.prepare import prepare_dataset
 
 app = typer.Typer(help="OMR Lab CLI. Pipelines: rules, hybrid, ai. With unified evaluation.")
 
-# ---- Typer param objects (как раньше) ----
 OPT_VERBOSE = typer.Option(False, "--verbose", "-v", help="Verbose JSON logs.")
 
 ARG_INPUT_RAW = typer.Argument(..., help="Input data folder (raw).")
@@ -38,6 +40,17 @@ OPT_OUT_SUMMARY = typer.Option(Path("experiments/reports/summary"), help="Output
 
 ARG_SOURCE = typer.Argument(..., help="Folder with metrics to summarize into a report.")
 OPT_OUT_FINAL = typer.Option(Path("experiments/reports/final"), help="Output folder.")
+
+# Новые параметры для data-команд
+ARG_MXL_IN = typer.Argument(..., help="Folder with MusicXML files.")
+ARG_IR_OUT = typer.Argument(..., help="Folder to write IR JSON.")
+OPT_SYNTH_OUT = typer.Option(
+    Path("data/synth"), "--out", "--out-dir", "-o", help="Output folder for synthetic MusicXML."
+)
+OPT_SYNTH_N = typer.Option(10, "--n", "-n", help="How many synthetic scores to generate.")
+OPT_SPLIT_OUT = typer.Option(
+    Path("data/splits"), "--out", "--out-dir", "-o", help="Output folder for split files."
+)
 # --------------------------------------------------------------
 
 
@@ -54,13 +67,51 @@ def prepare_data(
     output_path: Path = ARG_OUTPUT_PROCESSED,
     dpi: int = OPT_DPI,
 ) -> None:
-    # индивидуальный лог-файл для этой команды
     from omr_lab.common.logging import add_file_logging
 
     add_file_logging(output_path / "logs" / "prepare.jsonl")
     log.info("prepare_data_start", input=str(input_path), output=str(output_path), dpi=dpi)
     copied = prepare_dataset(input_path, output_path)
     log.info("prepare_data_done", copied=copied)
+
+
+@app.command("data-normalize")
+def data_normalize(
+    musicxml_dir: Path = ARG_MXL_IN,
+    ir_out: Path = ARG_IR_OUT,
+) -> None:
+    from omr_lab.common.logging import add_file_logging
+
+    add_file_logging(ir_out / "logs" / "normalize.jsonl")
+    log.info("normalize_start", input=str(musicxml_dir), out=str(ir_out))
+    count = normalize_folder(musicxml_dir, ir_out)
+    log.info("normalize_done", count=count)
+
+
+@app.command("data-synth")
+def data_synth(
+    out_dir: Path = OPT_SYNTH_OUT,
+    n: int = OPT_SYNTH_N,
+) -> None:
+    from omr_lab.common.logging import add_file_logging
+
+    add_file_logging(out_dir / "logs" / "synth.jsonl")
+    log.info("synth_start", out=str(out_dir), n=n)
+    count = synth_batch(out_dir, n=n)
+    log.info("synth_done", count=count)
+
+
+@app.command("data-split")
+def data_split(
+    ir_dir: Path = ARG_IR_OUT,
+    out_dir: Path = OPT_SPLIT_OUT,
+) -> None:
+    from omr_lab.common.logging import add_file_logging
+
+    add_file_logging(out_dir / "logs" / "split.jsonl")
+    log.info("split_start", ir=str(ir_dir), out=str(out_dir))
+    stratified_split(ir_dir, out_dir)
+    log.info("split_done", out=str(out_dir))
 
 
 @app.command("run-pipeline")
@@ -93,7 +144,6 @@ def run_pipeline(
     )
     out.mkdir(parents=True, exist_ok=True)
     inputs: list[Path] = [input_path]
-    # оставляем совместимость: pipeline пишет артефакты прямо в run_dir
     registry[impl](inputs, out, cfg_obj)
     ctx.finalize(status="ok")
 
