@@ -6,6 +6,11 @@ import typer
 
 from omr_lab.common.config import AppConfig, load_yaml
 from omr_lab.common.logging import log, setup_logging
+from omr_lab.eval.compare import compare_runs
+from omr_lab.eval.filelevel import eval_filelevel
+from omr_lab.eval.report import build_report
+from omr_lab.services.pipeline_registry import get_registry
+from omr_lab.services.prepare import prepare_dataset
 
 app = typer.Typer(help="OMR Lab CLI. Pipelines: rules, hybrid, ai. With unified evaluation.")
 
@@ -49,8 +54,8 @@ def prepare_data(
     dpi: int = OPT_DPI,
 ) -> None:
     log.info("prepare_data_start", input=str(input_path), output=str(output_path), dpi=dpi)
-    output_path.mkdir(parents=True, exist_ok=True)
-    log.info("prepare_data_done")
+    copied = prepare_dataset(input_path, output_path)
+    log.info("prepare_data_done", copied=copied)
 
 
 @app.command("run-pipeline")
@@ -60,6 +65,11 @@ def run_pipeline(
     input_path: Path = ARG_INPUT_PATH,
     out: Path = OPT_OUT_RUN,
 ) -> None:
+    registry = get_registry()
+    if impl not in registry:
+        raise typer.BadParameter(
+            f"Unknown implementation: {impl}. Available: {', '.join(registry)}"
+        )
     cfg: AppConfig | None = load_yaml(config) if config else None
     log.info(
         "run_pipeline_start",
@@ -69,9 +79,8 @@ def run_pipeline(
         out=str(out),
     )
     out.mkdir(parents=True, exist_ok=True)
-    (out / "placeholder.txt").write_text(
-        f"Pipeline {impl} would run here. Config: {cfg.model_dump() if cfg else '{}'}\n"
-    )
+    inputs: list[Path] = [input_path]
+    registry[impl](inputs, out, cfg)
     log.info("run_pipeline_done", out=str(out))
 
 
@@ -84,7 +93,7 @@ def eval_run(
 ) -> None:
     log.info("eval_start", pred=str(pred), gt=str(gt), config=str(config) if config else None)
     out.mkdir(parents=True, exist_ok=True)
-    (out / "metrics.csv").write_text("metric,value\nprecision,0.0\nrecall,0.0\nf1,0.0\n")
+    eval_filelevel(pred, gt, out / "metrics.csv")
     log.info("eval_done", out=str(out))
 
 
@@ -96,9 +105,7 @@ def compare(
 ) -> None:
     log.info("compare_start", runs=[str(r) for r in runs], metrics=metrics)
     out.mkdir(parents=True, exist_ok=True)
-    (out / "summary.csv").write_text(
-        "run,metric,value\n" + "\n".join(f"{r.name},f1,0.0" for r in runs) + "\n"
-    )
+    compare_runs(runs, out / "summary.csv")
     log.info("compare_done", out=str(out))
 
 
@@ -109,7 +116,7 @@ def report(
 ) -> None:
     log.info("report_start", source=str(source))
     out.mkdir(parents=True, exist_ok=True)
-    (out / "report.txt").write_text("Final report would be generated here.\n")
+    build_report(source, out / "report.txt")
     log.info("report_done", out=str(out))
 
 
