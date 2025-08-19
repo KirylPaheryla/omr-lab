@@ -6,6 +6,7 @@ import typer
 
 from omr_lab.common.config import AppConfig, load_yaml
 from omr_lab.common.logging import log, setup_logging
+from omr_lab.common.runctx import RunContext
 from omr_lab.eval.compare import compare_runs
 from omr_lab.eval.filelevel import eval_filelevel
 from omr_lab.eval.report import build_report
@@ -14,7 +15,7 @@ from omr_lab.services.prepare import prepare_dataset
 
 app = typer.Typer(help="OMR Lab CLI. Pipelines: rules, hybrid, ai. With unified evaluation.")
 
-# ---- Typer param objects (вынесены, чтобы избежать B008) ----
+# ---- Typer param objects (как раньше) ----
 OPT_VERBOSE = typer.Option(False, "--verbose", "-v", help="Verbose JSON logs.")
 
 ARG_INPUT_RAW = typer.Argument(..., help="Input data folder (raw).")
@@ -53,6 +54,10 @@ def prepare_data(
     output_path: Path = ARG_OUTPUT_PROCESSED,
     dpi: int = OPT_DPI,
 ) -> None:
+    # индивидуальный лог-файл для этой команды
+    from omr_lab.common.logging import add_file_logging
+
+    add_file_logging(output_path / "logs" / "prepare.jsonl")
     log.info("prepare_data_start", input=str(input_path), output=str(output_path), dpi=dpi)
     copied = prepare_dataset(input_path, output_path)
     log.info("prepare_data_done", copied=copied)
@@ -70,7 +75,15 @@ def run_pipeline(
         raise typer.BadParameter(
             f"Unknown implementation: {impl}. Available: {', '.join(registry)}"
         )
-    cfg: AppConfig | None = load_yaml(config) if config else None
+
+    cfg_obj: AppConfig | None = load_yaml(config) if config else None
+    cfg_effective: dict | None = cfg_obj.model_dump() if cfg_obj else None
+
+    ctx = RunContext.create(impl=impl, run_dir=out)
+    log.bind(run_id=ctx.run_id, impl=impl)
+    ctx.write_manifest(inputs=[str(input_path)])
+    ctx.save_configs(cfg_effective, config)
+
     log.info(
         "run_pipeline_start",
         impl=impl,
@@ -80,8 +93,9 @@ def run_pipeline(
     )
     out.mkdir(parents=True, exist_ok=True)
     inputs: list[Path] = [input_path]
-    registry[impl](inputs, out, cfg)
-    log.info("run_pipeline_done", out=str(out))
+    # оставляем совместимость: pipeline пишет артефакты прямо в run_dir
+    registry[impl](inputs, out, cfg_obj)
+    ctx.finalize(status="ok")
 
 
 @app.command("eval-run")
@@ -91,6 +105,9 @@ def eval_run(
     config: Path | None = OPT_EVAL_CONFIG,
     out: Path = OPT_OUT_EVAL,
 ) -> None:
+    from omr_lab.common.logging import add_file_logging
+
+    add_file_logging(out / "logs" / "eval.jsonl")
     log.info("eval_start", pred=str(pred), gt=str(gt), config=str(config) if config else None)
     out.mkdir(parents=True, exist_ok=True)
     eval_filelevel(pred, gt, out / "metrics.csv")
@@ -103,6 +120,9 @@ def compare(
     metrics: str = OPT_METRICS,
     out: Path = OPT_OUT_SUMMARY,
 ) -> None:
+    from omr_lab.common.logging import add_file_logging
+
+    add_file_logging(out / "logs" / "compare.jsonl")
     log.info("compare_start", runs=[str(r) for r in runs], metrics=metrics)
     out.mkdir(parents=True, exist_ok=True)
     compare_runs(runs, out / "summary.csv")
@@ -114,6 +134,9 @@ def report(
     source: Path = ARG_SOURCE,
     out: Path = OPT_OUT_FINAL,
 ) -> None:
+    from omr_lab.common.logging import add_file_logging
+
+    add_file_logging(out / "logs" / "report.jsonl")
     log.info("report_start", source=str(source))
     out.mkdir(parents=True, exist_ok=True)
     build_report(source, out / "report.txt")
