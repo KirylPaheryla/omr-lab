@@ -54,6 +54,19 @@ OPT_SPLIT_OUT = typer.Option(
     Path("data/splits"), "--out", "--out-dir", "-o", help="Output folder for split files."
 )
 
+# data-normalize speed-ups
+OPT_NORM_JOBS = typer.Option(1, "--jobs", "-j", help="Parallel workers for normalization.")
+OPT_NORM_SKIP = typer.Option(
+    True, "--skip-if-exists/--no-skip-if-exists", help="Skip files with up-to-date outputs."
+)
+OPT_NORM_LYR = typer.Option(
+    False, "--lyrics-only", help="Normalize only files that contain <lyric>."
+)
+OPT_NORM_NO_KEY = typer.Option(False, "--no-key", help="Disable key analysis (faster).")
+OPT_NORM_QUIET = typer.Option(
+    False, "--quiet-warnings", help="Suppress music21 warnings (faster, cleaner logs)."
+)
+
 # QA params (avoid B008 by hoisting Typer objects)
 ARG_COCO_PATH = typer.Argument(..., help="Path to COCO JSON (from data-render).")
 OPT_PAGES_CSV = typer.Option(None, "--pages", help="Optional pages.csv for has_lyrics stats.")
@@ -101,13 +114,33 @@ def prepare_data(
 def data_normalize(
     musicxml_dir: Path = ARG_MXL_IN,
     ir_out: Path = ARG_IR_OUT,
+    jobs: int = OPT_NORM_JOBS,
+    skip_if_exists: bool = OPT_NORM_SKIP,
+    lyrics_only: bool = OPT_NORM_LYR,
+    no_key: bool = OPT_NORM_NO_KEY,
+    quiet_warnings: bool = OPT_NORM_QUIET,  # ← добавили
 ) -> None:
-    """Normalize MusicXML files into intermediate representation (IR)."""
     from omr_lab.common.logging import add_file_logging
 
     add_file_logging(ir_out / "logs" / "normalize.jsonl")
-    log.info("normalize_start", input=str(musicxml_dir), out=str(ir_out))
-    count = normalize_folder(musicxml_dir, ir_out)
+    log.info(
+        "normalize_start",
+        input=str(musicxml_dir),
+        out=str(ir_out),
+        jobs=jobs,
+        skip_if_exists=skip_if_exists,
+        lyrics_only=lyrics_only,
+        analyze_key=not no_key,
+    )
+    count = normalize_folder(
+        musicxml_dir,
+        ir_out,
+        jobs=jobs,
+        skip_if_exists=skip_if_exists,
+        lyrics_only=lyrics_only,
+        analyze_key=not no_key,
+        quiet_warnings=quiet_warnings,  # ← добавили
+    )
     log.info("normalize_done", count=count)
 
 

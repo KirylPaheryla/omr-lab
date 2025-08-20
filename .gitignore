@@ -23,6 +23,7 @@ Thumbs.db
 
 # Data and experiments
 data/processed/
+data/raw/
 experiments/runs/
 experiments/reports/
 

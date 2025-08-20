@@ -1,0 +1,3 @@
+C:\Code\omr-lab\data\annotations\openscore\lc5979580.error.txt
+C:\Code\omr-lab\data\annotations\openscore\lc5995492.error.txt
+C:\Code\omr-lab\data\annotations\openscore\lc6159273.error.txt

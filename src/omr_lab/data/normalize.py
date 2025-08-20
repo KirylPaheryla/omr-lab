@@ -1,19 +1,33 @@
 from __future__ import annotations
 
 import json
+import zipfile
+from collections.abc import Iterable
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, cast
 
-from music21 import converter, meter, note, stream
+from music21 import converter, exceptions21, meter, note, stream  # ← добавили exceptions21
 from omr_lab.common.ir import LyricsToken, MeasureIR, NoteEvent, PartIR, ScoreIR
+from omr_lab.common.logging import log
+
+
+def _silence_music21_warnings() -> None:
+    """Suppress noisy music21 warnings to speed up and declutter output."""
+    import warnings
+
+    # Filter only categories that actually exist in this music21 build
+    for name in ("MusicXMLWarning", "Music21DeprecationWarning"):
+        cat = getattr(exceptions21, name, None)
+        if isinstance(cat, type) and issubclass(cat, Warning):
+            warnings.filterwarnings("ignore", category=cat)
 
 
 def _coerce_to_score(obj: Any) -> stream.Score:
-    """Convert the result of converter.parse to Score (handle Opus/Part)."""
+    """Coerce converter.parse result to a Score (handle Opus/Part)."""
     if isinstance(obj, stream.Score):
         return obj
     if isinstance(obj, stream.Opus):
-        # Take the first Score from the Opus (often only one)
         if obj.scores:
             return obj.scores[0]
         sc = stream.Score()
@@ -25,7 +39,6 @@ def _coerce_to_score(obj: Any) -> stream.Score:
         sc = stream.Score()
         sc.insert(0, obj)
         return sc
-    # Fallback: try to build a Score from available Parts
     sc = stream.Score()
     parts = getattr(obj, "parts", None)
     if parts:
@@ -42,7 +55,26 @@ def _safe_int(v: Any, default: int) -> int:
         return default
 
 
-def musicxml_to_ir(path: Path) -> ScoreIR:
+def _coerce_alter(val: Any) -> tuple[int, bool]:
+    """
+    Return (alter_int, was_microtonal).
+    Accepts float-like values (e.g., -0.3). If it's within ~1/3 of a semitone,
+    round to nearest int; otherwise clamp to 0 and mark as microtonal.
+    """
+    try:
+        f = float(val)
+    except Exception:
+        return 0, False
+    if f < -2.5 or f > 2.5:
+        return 0, True
+    rounded = int(round(f))
+    if abs(f - rounded) <= 0.34:
+        return max(-2, min(2, rounded)), abs(f - rounded) > 1e-6
+    # too fractional → drop to 0 but mark it
+    return 0, True
+
+
+def musicxml_to_ir(path: Path, *, analyze_key: bool = True) -> ScoreIR:
     parsed = converter.parse(path.as_posix())
     sc: stream.Score = _coerce_to_score(parsed)
 
@@ -55,18 +87,19 @@ def musicxml_to_ir(path: Path) -> ScoreIR:
             ts = m.ratioString
     except Exception:
         ts = None
-    try:
-        k = sc.analyze("key")
-        if k is not None:
-            kf = int(k.sharps)
-    except Exception:
-        kf = None
+    if analyze_key:
+        try:
+            k = sc.analyze("key")
+            if k is not None:
+                kf = int(k.sharps)
+        except Exception:
+            kf = None
 
     parts_ir: list[PartIR] = []
     for p_idx, p in enumerate(sc.parts):
         measures_ir: list[MeasureIR] = []
-        flat: stream.Stream = p.flat  # type: ignore[assignment]
-        # measureNumber may be None → filter and cast to int
+        flat: stream.Stream = p.flatten()  # .flat is deprecated
+
         measure_numbers = sorted(
             {
                 int(mn)
@@ -93,7 +126,13 @@ def musicxml_to_ir(path: Path) -> ScoreIR:
 
                     step = el.pitch.step
                     octv = _safe_int(el.pitch.octave, 4)
-                    alter = _safe_int(el.pitch.accidental.alter if el.pitch.accidental else 0, 0)
+                    alter_raw = el.pitch.accidental.alter if el.pitch.accidental else 0
+                    alter, was_micro = _coerce_alter(alter_raw)
+                    if was_micro:
+                        from omr_lab.common.logging import log
+
+                        log.debug("microtonal_alter_coerced", raw=float(alter_raw or 0), used=alter)
+
                     dur_q = float(el.duration.quarterLength)
                     off_q = float(el.offset)
                     voice_val = getattr(el, "voice", None)
@@ -150,19 +189,132 @@ def musicxml_to_ir(path: Path) -> ScoreIR:
     )
 
 
-def normalize_folder(in_dir: Path, out_dir: Path) -> int:
+def _quick_has_lyrics(path: Path) -> bool:
+    """Fast check: does file contain '<lyric' (also inside .mxl zip)."""
+    try:
+        ext = path.suffix.lower()
+        if ext in {".xml", ".musicxml"}:
+            # Read small chunks to avoid loading huge files
+            text = path.read_text(encoding="utf-8", errors="ignore")
+            return "<lyric" in text
+        if ext == ".mxl":
+            with zipfile.ZipFile(path, "r") as zf:
+                for zi in zf.infolist():
+                    if zi.filename.lower().endswith(".xml"):
+                        with zf.open(zi, "r") as fh:
+                            data = fh.read()
+                            try:
+                                txt = data.decode("utf-8", errors="ignore")
+                            except Exception:
+                                txt = ""
+                            if "<lyric" in txt:
+                                return True
+            return False
+    except Exception:
+        return False
+    return False
+
+
+def _should_skip(in_path: Path, out_path: Path, skip_if_exists: bool) -> bool:
+    if not out_path.exists():
+        return False
+    if not skip_if_exists:
+        return False
+    # incremental: skip if output is newer or same mtime
+    try:
+        return out_path.stat().st_mtime >= in_path.stat().st_mtime
+    except Exception:
+        return True
+
+
+def _process_one(args: tuple[Path, Path, bool, bool, bool]) -> tuple[Path, bool, str | None]:
+    """
+    Worker for parallel normalization.
+    Returns (in_path, ok, error_msg).
+    """
+    in_path, out_dir, analyze_key, overwrite, quiet = args
+    try:
+        if quiet:
+            _silence_music21_warnings()
+        out_path = out_dir / (in_path.stem + ".json")
+        if not overwrite and out_path.exists():
+            return in_path, True, None
+        ir = musicxml_to_ir(in_path, analyze_key=analyze_key)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(
+            json.dumps(ir.model_dump(), indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+        return in_path, True, None
+    except Exception as e:
+        err_path = out_dir / (in_path.stem + ".error.txt")
+        err_path.write_text(str(e), encoding="utf-8")
+        return in_path, False, str(e)
+
+
+def _gather_files(in_dir: Path) -> list[Path]:
+    return [p for p in in_dir.rglob("*") if p.suffix.lower() in {".musicxml", ".xml", ".mxl"}]
+
+
+def normalize_folder(
+    in_dir: Path,
+    out_dir: Path,
+    *,
+    jobs: int = 1,
+    skip_if_exists: bool = True,
+    lyrics_only: bool = False,
+    analyze_key: bool = True,
+    quiet_warnings: bool = False,  # ← новый флаг
+) -> int:
+    """
+    Normalize MusicXML/MXL into ScoreIR.
+
+    Args:
+        jobs: parallel workers (>=1)
+        skip_if_exists: skip files with up-to-date JSON
+        lyrics_only: pre-filter by presence of '<lyric' (fast scan)
+        analyze_key: run music21 key analysis (slower)
+        quiet_warnings: suppress music21 warnings
+    """
+    if quiet_warnings and jobs <= 1:
+        # В однопоточном режиме можно заглушить глобально
+        _silence_music21_warnings()
+
     out_dir.mkdir(parents=True, exist_ok=True)
-    count = 0
-    for p in in_dir.rglob("*"):
-        if p.suffix.lower() in {".musicxml", ".xml", ".mxl"}:
-            try:
-                ir = musicxml_to_ir(p)
-                out_path = out_dir / (p.stem + ".json")
-                # Pydantic v2: use json.dumps(c.dict())
-                out_path.write_text(
-                    json.dumps(ir.model_dump(), indent=2, ensure_ascii=False), encoding="utf-8"
-                )
-                count += 1
-            except Exception as e:
-                (out_dir / (p.stem + ".error.txt")).write_text(str(e), encoding="utf-8")
-    return count
+    files = _gather_files(in_dir)
+    if lyrics_only:
+        files = [p for p in files if _quick_has_lyrics(p)]
+
+    candidates: list[Path] = []
+    for p in files:
+        out_path = out_dir / (p.stem + ".json")
+        if _should_skip(p, out_path, skip_if_exists):
+            continue
+        candidates.append(p)
+
+    if not candidates:
+        log.info("normalize_no_candidates", in_dir=str(in_dir))
+        return 0
+
+    # single-thread
+    if jobs <= 1:
+        ok = 0
+        for p in candidates:
+            _, success, _ = _process_one((p, out_dir, analyze_key, True, quiet_warnings))
+            ok += int(success)
+        return ok
+
+    # parallel
+    ok = 0
+    args_iter: Iterable[tuple[Path, Path, bool, bool, bool]] = (
+        (p, out_dir, analyze_key, True, quiet_warnings) for p in candidates
+    )
+    with ProcessPoolExecutor(max_workers=jobs) as ex:
+        futs = [ex.submit(_process_one, a) for a in args_iter]
+        for i, fut in enumerate(as_completed(futs), start=1):
+            _p, success, err = fut.result()
+            ok += int(success)
+            if not success:
+                log.warning("normalize_failed", file=str(_p), error=err)
+            if i % 50 == 0:
+                log.info("normalize_progress", done=i, total=len(futs))
+    return ok
