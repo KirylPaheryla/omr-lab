@@ -10,7 +10,10 @@ from omr_lab.common.logging import log
 from omr_lab.data.coco import CocoAnnotation, CocoImage, default_categories, write_coco
 from omr_lab.data.normalize import musicxml_to_ir
 from omr_lab.render.musescore import render_png_with_musescore
-from omr_lab.render.verovio import extract_lyrics_bboxes_from_svg, render_svg_with_verovio
+from omr_lab.render.verovio import (
+    extract_lyrics_bboxes_from_svg,
+    render_svg_with_verovio,
+)
 
 
 def _infer_pages_pngs(out_dir: Path, one_png: Path) -> list[Path]:
@@ -51,7 +54,15 @@ def render_dataset(
         wp = csv.writer(fp_pages)
         wl = csv.writer(fp_links)
         wp.writerow(
-            ["page_id", "work_id", "image_path", "width", "height", "has_lyrics", "n_syllables"]
+            [
+                "page_id",
+                "work_id",
+                "image_path",
+                "width",
+                "height",
+                "has_lyrics",
+                "n_syllables",
+            ]
         )
         wl.writerow(["annotation_id", "note_id"])
 
@@ -61,7 +72,11 @@ def render_dataset(
         img_id = 1
 
         for xml in sorted(
-            [p for p in input_dir.rglob("*") if p.suffix.lower() in {".musicxml", ".xml", ".mxl"}]
+            [
+                p
+                for p in input_dir.rglob("*")
+                if p.suffix.lower() in {".musicxml", ".xml", ".mxl"}
+            ]
         ):
             stem = xml.stem
             work_id = stem
@@ -71,7 +86,10 @@ def render_dataset(
             # 1) IR (to link syllable -> note_id)
             ir = musicxml_to_ir(xml)
             tokens = [
-                (m.number, tok) for part in ir.parts for m in part.measures for tok in m.lyrics
+                (m.number, tok)
+                for part in ir.parts
+                for m in part.measures
+                for tok in m.lyrics
             ]
 
             # 2) PNG via MuseScore
@@ -86,7 +104,9 @@ def render_dataset(
             svg_bboxes: list[dict[str, Any]] = []
             if verovio_cmd:
                 out_svg = out_ann_dir / f"{stem}.svg"
-                svgs = render_svg_with_verovio(verovio_cmd, xml, out_svg, all_pages=False, scale=40)
+                svgs = render_svg_with_verovio(
+                    verovio_cmd, xml, out_svg, all_pages=False, scale=40
+                )
                 for svg in svgs:
                     svg_bboxes += extract_lyrics_bboxes_from_svg(svg)
 
@@ -119,7 +139,10 @@ def render_dataset(
                 h, w = img.shape[:2]
                 coco_images.append(
                     CocoImage(
-                        id=img_id, file_name=str(png.relative_to(out_images)), width=w, height=h
+                        id=img_id,
+                        file_name=str(png.relative_to(out_images)),
+                        width=w,
+                        height=h,
                     )
                 )
 
@@ -171,7 +194,12 @@ def render_dataset(
                 img_id += 1
 
             dt = time.time() - t0
-            log.info("render_file_done", file=str(xml), pages=len(produced_pngs), secs=f"{dt:.2f}")
+            log.info(
+                "render_file_done",
+                file=str(xml),
+                pages=len(produced_pngs),
+                secs=f"{dt:.2f}",
+            )
 
         write_coco(coco_path, coco_images, coco_ann, default_categories())
 

@@ -31,3 +31,6 @@ experiments/reports/
 data/synth/
 data/annotations/
 data/splits/
+
+# Quarantined files
+/data/quarantine/

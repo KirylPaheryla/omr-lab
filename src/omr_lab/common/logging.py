@@ -40,10 +40,15 @@ def add_file_logging(log_file: Path, level: int = logging.INFO) -> None:
 
     target = log_file.as_posix()
     for h in root_logger.handlers:
-        if isinstance(h, RotatingFileHandler) and getattr(h, "baseFilename", "") == target:
+        if (
+            isinstance(h, RotatingFileHandler)
+            and getattr(h, "baseFilename", "") == target
+        ):
             return
 
-    fh = RotatingFileHandler(target, maxBytes=5 * 1024 * 1024, backupCount=3, encoding="utf-8")
+    fh = RotatingFileHandler(
+        target, maxBytes=5 * 1024 * 1024, backupCount=3, encoding="utf-8"
+    )
     fh.setLevel(level)
     fh.setFormatter(logging.Formatter("%(message)s"))
     root_logger.addHandler(fh)

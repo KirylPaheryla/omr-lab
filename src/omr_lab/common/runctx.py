@@ -18,7 +18,9 @@ def _now_iso() -> str:
 def _git_info(root: Path) -> dict[str, Any]:
     def _cmd(args: list[str]) -> str | None:
         try:
-            r = subprocess.run(args, cwd=root, capture_output=True, text=True, check=True)
+            r = subprocess.run(
+                args, cwd=root, capture_output=True, text=True, check=True
+            )
             return r.stdout.strip()
         except Exception:
             return None
@@ -88,12 +90,16 @@ class RunContext:
         log.info("run_start", run_id=ctx.run_id, impl=impl, run_dir=str(run_dir))
         return ctx
 
-    def save_configs(self, effective_cfg: dict | None, source_cfg_path: Path | None) -> None:
+    def save_configs(
+        self, effective_cfg: dict | None, source_cfg_path: Path | None
+    ) -> None:
         self.configs_dir.mkdir(parents=True, exist_ok=True)
         if source_cfg_path:
             dst = self.configs_dir / "used.yaml"
             try:
-                dst.write_text(Path(source_cfg_path).read_text(encoding="utf-8"), encoding="utf-8")
+                dst.write_text(
+                    Path(source_cfg_path).read_text(encoding="utf-8"), encoding="utf-8"
+                )
             except Exception as e:
                 log.warning("config_copy_failed", error=str(e))
         if effective_cfg is not None:
@@ -101,7 +107,8 @@ class RunContext:
             import json
 
             eff.write_text(
-                json.dumps(effective_cfg, ensure_ascii=False, indent=2), encoding="utf-8"
+                json.dumps(effective_cfg, ensure_ascii=False, indent=2),
+                encoding="utf-8",
             )
 
     def write_manifest(self, inputs: list[str]) -> None:

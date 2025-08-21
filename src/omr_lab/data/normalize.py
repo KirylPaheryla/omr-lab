@@ -7,7 +7,13 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any, cast
 
-from music21 import converter, exceptions21, meter, note, stream  # ← добавили exceptions21
+from music21 import (
+    converter,
+    exceptions21,
+    meter,
+    note,
+    stream,
+)  # ← добавили exceptions21
 from omr_lab.common.ir import LyricsToken, MeasureIR, NoteEvent, PartIR, ScoreIR
 from omr_lab.common.logging import log
 
@@ -103,7 +109,9 @@ def musicxml_to_ir(path: Path, *, analyze_key: bool = True) -> ScoreIR:
         measure_numbers = sorted(
             {
                 int(mn)
-                for mn in (getattr(n, "measureNumber", None) for n in flat.notesAndRests)
+                for mn in (
+                    getattr(n, "measureNumber", None) for n in flat.notesAndRests
+                )
                 if mn is not None
             }
         )
@@ -131,7 +139,11 @@ def musicxml_to_ir(path: Path, *, analyze_key: bool = True) -> ScoreIR:
                     if was_micro:
                         from omr_lab.common.logging import log
 
-                        log.debug("microtonal_alter_coerced", raw=float(alter_raw or 0), used=alter)
+                        log.debug(
+                            "microtonal_alter_coerced",
+                            raw=float(alter_raw or 0),
+                            used=alter,
+                        )
 
                     dur_q = float(el.duration.quarterLength)
                     off_q = float(el.offset)
@@ -176,16 +188,28 @@ def musicxml_to_ir(path: Path, *, analyze_key: bool = True) -> ScoreIR:
                                 )
                             )
 
-            measures_ir.append(MeasureIR(number=int(mnum), notes=notes_ir, lyrics=lyrics_ir))
+            measures_ir.append(
+                MeasureIR(number=int(mnum), notes=notes_ir, lyrics=lyrics_ir)
+            )
 
         parts_ir.append(
-            PartIR(id=f"P{p_idx+1}", name=p.partName or f"Part {p_idx+1}", measures=measures_ir)
+            PartIR(
+                id=f"P{p_idx+1}",
+                name=p.partName or f"Part {p_idx+1}",
+                measures=measures_ir,
+            )
         )
 
-    has_lyrics = any(tok for part in parts_ir for m in part.measures for tok in m.lyrics)
+    has_lyrics = any(
+        tok for part in parts_ir for m in part.measures for tok in m.lyrics
+    )
 
     return ScoreIR(
-        title=title, parts=parts_ir, time_signature=ts, key_fifths=kf, has_lyrics=has_lyrics
+        title=title,
+        parts=parts_ir,
+        time_signature=ts,
+        key_fifths=kf,
+        has_lyrics=has_lyrics,
     )
 
 
@@ -227,7 +251,9 @@ def _should_skip(in_path: Path, out_path: Path, skip_if_exists: bool) -> bool:
         return True
 
 
-def _process_one(args: tuple[Path, Path, bool, bool, bool]) -> tuple[Path, bool, str | None]:
+def _process_one(
+    args: tuple[Path, Path, bool, bool, bool]
+) -> tuple[Path, bool, str | None]:
     """
     Worker for parallel normalization.
     Returns (in_path, ok, error_msg).
@@ -252,7 +278,11 @@ def _process_one(args: tuple[Path, Path, bool, bool, bool]) -> tuple[Path, bool,
 
 
 def _gather_files(in_dir: Path) -> list[Path]:
-    return [p for p in in_dir.rglob("*") if p.suffix.lower() in {".musicxml", ".xml", ".mxl"}]
+    return [
+        p
+        for p in in_dir.rglob("*")
+        if p.suffix.lower() in {".musicxml", ".xml", ".mxl"}
+    ]
 
 
 def normalize_folder(
@@ -299,7 +329,9 @@ def normalize_folder(
     if jobs <= 1:
         ok = 0
         for p in candidates:
-            _, success, _ = _process_one((p, out_dir, analyze_key, True, quiet_warnings))
+            _, success, _ = _process_one(
+                (p, out_dir, analyze_key, True, quiet_warnings)
+            )
             ok += int(success)
         return ok
 

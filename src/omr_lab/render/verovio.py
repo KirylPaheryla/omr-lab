@@ -25,7 +25,15 @@ def render_svg_with_verovio(
     cmd: list[str] = [verovio_cmd]
     if all_pages:
         cmd += ["-a"]
-    cmd += ["-f", "musicxml", "--scale", str(scale), input_xml.as_posix(), "-o", out_svg.as_posix()]
+    cmd += [
+        "-f",
+        "musicxml",
+        "--scale",
+        str(scale),
+        input_xml.as_posix(),
+        "-o",
+        out_svg.as_posix(),
+    ]
     if extra_args:
         cmd += extra_args
 
@@ -84,6 +92,8 @@ def extract_lyrics_bboxes_from_svg(svg_path: Path) -> list[dict]:
             y = float(t.attrib.get("y", "0") or 0)
             txt = "".join(t.itertext()).strip() or None
             xml_id = t.attrib.get("{http://www.w3.org/XML/1998/namespace}id")
-            out.append({"x": x, "y": y, "w": 0.0, "h": 0.0, "text": txt, "xml_id": xml_id})
+            out.append(
+                {"x": x, "y": y, "w": 0.0, "h": 0.0, "text": txt, "xml_id": xml_id}
+            )
 
     return out

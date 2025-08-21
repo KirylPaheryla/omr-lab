@@ -57,7 +57,9 @@ def _iter_images(paths: Iterable[Path]) -> list[Path]:
     return sorted(result)
 
 
-def run_rules_pipeline(inputs: Iterable[Path], out_dir: Path, config: AppConfig | None) -> None:
+def run_rules_pipeline(
+    inputs: Iterable[Path], out_dir: Path, config: AppConfig | None
+) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     images = _iter_images(inputs)
     log.info("rules_pipeline_input", count=len(images))

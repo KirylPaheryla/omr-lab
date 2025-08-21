@@ -38,7 +38,9 @@ def qa_coco(coco_path: Path, pages_csv: Path | None = None) -> QaReport:
     data = json.loads(coco_path.read_text(encoding="utf-8"))
     ann = data.get("annotations", [])
     imgs = data.get("images", [])
-    with_bbox = sum(1 for a in ann if any(float(x) > 0 for x in a.get("bbox", [0, 0, 0, 0])))
+    with_bbox = sum(
+        1 for a in ann if any(float(x) > 0 for x in a.get("bbox", [0, 0, 0, 0]))
+    )
     coverage = (with_bbox / len(ann) * 100.0) if ann else 0.0
 
     images_with_lyrics = 0

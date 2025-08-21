@@ -27,7 +27,9 @@ def stratified_split(
     with_lyrics = [p for p in items if p[1]]
     without_lyrics = [p for p in items if not p[1]]
 
-    def _split(lst: list[tuple[Path, bool]]) -> tuple[list[Path], list[Path], list[Path]]:
+    def _split(
+        lst: list[tuple[Path, bool]]
+    ) -> tuple[list[Path], list[Path], list[Path]]:
         random.Random(seed).shuffle(lst)
         n = len(lst)
         n_train = int(n * ratios[0])

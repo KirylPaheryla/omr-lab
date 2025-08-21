@@ -42,7 +42,9 @@ def _attach_lyrics_to_notes(nlist: list[note.Note], words: list[str]) -> None:
             n.lyrics.append(lyr)
 
 
-def synth_one(out_musicxml: Path, words: list[str] | None = None, measures: int = 4) -> ScoreIR:
+def synth_one(
+    out_musicxml: Path, words: list[str] | None = None, measures: int = 4
+) -> ScoreIR:
     sc = stream.Score()
     sc.insert(0, tempo.MetronomeMark(number=100))
     p = stream.Part()
@@ -65,7 +67,9 @@ def synth_one(out_musicxml: Path, words: list[str] | None = None, measures: int 
     return musicxml_to_ir(out_musicxml)
 
 
-def synth_batch(out_dir: Path, n: int = 10, words_bank: Iterable[list[str]] | None = None) -> int:
+def synth_batch(
+    out_dir: Path, n: int = 10, words_bank: Iterable[list[str]] | None = None
+) -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
     if words_bank is None:
         words_bank = [

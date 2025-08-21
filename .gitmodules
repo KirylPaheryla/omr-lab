@@ -1,0 +1,3 @@
+[submodule "external/PDMX"]
+	path = external/PDMX
+	url = https://github.com/pnlong/PDMX.git
