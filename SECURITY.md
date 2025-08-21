@@ -13,7 +13,7 @@ We actively support the latest `main` branch only.
 ## Reporting a Vulnerability
 **Do not disclose publicly.** Use one of the private channels:
 
-1. **GitHub Private Vulnerability Report (preferred):**  
+1. **GitHub Private Vulnerability Report (preferred):**
    Go to **Security → Report a vulnerability** in this repository.
 2. If the above is unavailable, open a **blank issue** with the title “Security contact request” (no details), and we’ll move to a private channel.
 
@@ -26,7 +26,7 @@ Please include (when possible):
 ## Disclosure Policy (Best-Effort)
 - Acknowledge within **7 days**
 - Triage within **14 days**
-- Target fix: **≤30 days** for Critical/High, **≤90 days** for others  
+- Target fix: **≤30 days** for Critical/High, **≤90 days** for others
   (Timeframes are goals; as a thesis project, delays are possible.)
 
 We’ll publish a GitHub Security Advisory with affected versions and remediation guidance. CVE assignment is not guaranteed.
