@@ -215,8 +215,15 @@ def pdmx_export(
     lyrics_only: bool = OPT_PDMX_LYRICS,
     no_conflict_only: bool = OPT_PDMX_NO_CONFLICT,
     ext: str = OPT_PDMX_EXT,
+    quiet_warnings: bool = typer.Option(
+        True, "--quiet-warnings", help="Silence music21 warnings during export."
+    ),
+    min_denominator: int = typer.Option(
+        1024,
+        "--min-denominator",
+        help="Clamp durations shorter than 1/<denominator> so music21 can serialize to MusicXML.",
+    ),
 ) -> None:
-    """Export PDMX MusicRender JSON to MusicXML/MXL files."""
     from omr_lab.common.logging import add_file_logging
     from omr_lab.data.pdmx_export import export_pdmx_to_musicxml
 
@@ -231,24 +238,22 @@ def pdmx_export(
         no_conflict_only=no_conflict_only,
         ext=ext,
     )
+
     summary = export_pdmx_to_musicxml(
-        pdmx_root,
-        out_dir,
+        root=pdmx_root,
+        out_dir=out_dir,
         csv_path=csv_path,
         jobs=jobs,
         lyrics_only=lyrics_only,
         no_conflict_only=no_conflict_only,
         ext=ext,
+        quiet_warnings=quiet_warnings,
+        min_denominator=min_denominator,
     )
 
-    import typer as _ty
-
-    if isinstance(summary, int):
-        _ty.echo(f"exported={summary} failed=0 total={summary}")
-    else:
-        _ty.echo(
-            f"exported={summary['exported']} failed={summary['failed']} total={summary['total']}"
-        )
+    typer.echo(
+        f"exported={summary['exported']} failed={summary['failed']} total={summary['total']}"
+    )
 
 
 @app.command("data-synth")
