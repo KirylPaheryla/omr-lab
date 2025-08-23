@@ -23,7 +23,7 @@ def render_png_with_musescore(
     out_png = out_png.resolve()
     out_png.parent.mkdir(parents=True, exist_ok=True)
 
-    cmd: list[str] = [musescore_cmd]
+    cmd: list[str] = [musescore_cmd, "-s"]
     if trim_px and trim_px > 0:
         # Optional: not all versions support -T
         cmd += ["-T", str(trim_px)]
@@ -33,11 +33,20 @@ def render_png_with_musescore(
 
     log.info("musescore_cmd", cmd=" ".join(cmd))
     try:
-        subprocess.run(cmd, check=True)
+        subprocess.run(
+            cmd,
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
     except FileNotFoundError as err:
         raise RuntimeError(f"MuseScore CLI not found: {musescore_cmd}") from err
     except subprocess.CalledProcessError as err:
-        raise RuntimeError(f"MuseScore render failed: {err}") from err
+        raise RuntimeError(
+            f"MuseScore render failed (code {err.returncode}).\n"
+            f"STDOUT:\n{err.stdout}\n\nSTDERR:\n{err.stderr}"
+        ) from err
 
     produced: list[Path] = []
     if out_png.exists():

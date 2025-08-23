@@ -48,7 +48,7 @@ def stratified_split(
 
     def _write_list(name: str, lst: list[Path]) -> None:
         (out_dir / f"{name}.txt").write_text(
-            "\n".join(p.as_posix() for p in sorted(lst)) + "\n", encoding="utf-8"
+            "\n".join(sorted(p.stem for p in lst)) + "\n", encoding="utf-8"
         )
 
     _write_list("train", train)

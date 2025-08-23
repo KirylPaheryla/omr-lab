@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import os
 import time
 from pathlib import Path
 from typing import Any
@@ -25,6 +26,18 @@ def _infer_pages_pngs(out_dir: Path, one_png: Path) -> list[Path]:
     return []
 
 
+def _safe_rel(p: Path, base: Path) -> Path:
+    p = Path(p)
+    base = Path(base)
+    try:
+        return p.relative_to(base)
+    except Exception:
+        try:
+            return Path(os.path.relpath(p, base))
+        except Exception:
+            return Path(p.name)
+
+
 def render_dataset(
     input_dir: Path,
     out_images: Path,
@@ -41,6 +54,9 @@ def render_dataset(
          - pages.csv (page_id, work_id, image_path, width, height, has_lyrics, n_syllables)
          - links.csv (syllable_ann_id, note_id)
     """
+    input_dir = Path(input_dir).resolve()
+    out_images = Path(out_images).resolve()
+    out_ann_dir = Path(out_ann_dir).resolve()
     out_images.mkdir(parents=True, exist_ok=True)
     out_ann_dir.mkdir(parents=True, exist_ok=True)
     pages_csv = out_ann_dir / "pages.csv"
@@ -140,7 +156,7 @@ def render_dataset(
                 coco_images.append(
                     CocoImage(
                         id=img_id,
-                        file_name=str(png.relative_to(out_images)),
+                        file_name=str(_safe_rel(png, out_images)),
                         width=w,
                         height=h,
                     )
@@ -184,7 +200,7 @@ def render_dataset(
                     [
                         f"{stem}_p{page_no:03d}",
                         work_id,
-                        str(png.relative_to(out_images)),
+                        str(_safe_rel(png, out_images)),
                         w,
                         h,
                         int(ir.has_lyrics),
