@@ -24,7 +24,7 @@ class IRSummary:
 
 
 def _load_ir(path: Path) -> ScoreIR:
-    # Быстрая валидация схемы через Pydantic
+    # Fast schema validation using Pydantic
     text = path.read_text(encoding="utf-8")
     return ScoreIR.model_validate_json(text)
 
@@ -78,11 +78,11 @@ def qa_ir_dir(ir_dir: Path) -> tuple[IRSummary, list[dict[str, Any]]]:
                     else:
                         file_syll[t.syllabic] = 1
                     if t.note_id not in note_ids_all:
-                        # Если lyric пришёл раньше, чем соответствующая нота в списке:
-                        # проверим ещё раз «лениво» после сбора всех нот.
+                        # If a lyric arrives before its corresponding note:
+                        # check again lazily after collecting all notes.
                         pass
 
-        # Повторная проверка «висячих» лирик после того, как собрали все ноты
+        # Second pass to check for dangling lyrics after gathering all notes
         for part in ir.parts:
             for m in part.measures:
                 for t in m.lyrics:

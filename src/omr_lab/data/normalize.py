@@ -13,7 +13,7 @@ from music21 import (
     meter,
     note,
     stream,
-)  # ← добавили exceptions21
+)  # added exceptions21
 from omr_lab.common.ir import LyricsToken, MeasureIR, NoteEvent, PartIR, ScoreIR
 from omr_lab.common.logging import log
 
@@ -293,7 +293,7 @@ def normalize_folder(
     skip_if_exists: bool = True,
     lyrics_only: bool = False,
     analyze_key: bool = True,
-    quiet_warnings: bool = False,  # ← новый флаг
+    quiet_warnings: bool = False,  # new flag
 ) -> int:
     """
     Normalize MusicXML/MXL into ScoreIR.
@@ -306,7 +306,7 @@ def normalize_folder(
         quiet_warnings: suppress music21 warnings
     """
     if quiet_warnings and jobs <= 1:
-        # В однопоточном режиме можно заглушить глобально
+        # In single-thread mode we can silence globally
         _silence_music21_warnings()
 
     out_dir.mkdir(parents=True, exist_ok=True)
