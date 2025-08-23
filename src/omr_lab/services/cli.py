@@ -180,7 +180,7 @@ def data_normalize(
     skip_if_exists: bool = OPT_NORM_SKIP,
     lyrics_only: bool = OPT_NORM_LYR,
     no_key: bool = OPT_NORM_NO_KEY,
-    quiet_warnings: bool = OPT_NORM_QUIET,  # ← добавили
+    quiet_warnings: bool = OPT_NORM_QUIET,  # added
 ) -> None:
     from omr_lab.common.logging import add_file_logging
 
@@ -201,7 +201,7 @@ def data_normalize(
         skip_if_exists=skip_if_exists,
         lyrics_only=lyrics_only,
         analyze_key=not no_key,
-        quiet_warnings=quiet_warnings,  # ← добавили
+        quiet_warnings=quiet_warnings,  # added
     )
     log.info("normalize_done", count=count)
 
@@ -341,7 +341,7 @@ def ir_qa(
     add_file_logging(ir_dir / "logs" / "ir_qa.jsonl")
     summary, rows = qa_ir_dir(ir_dir)
 
-    # Краткая сводка в консоль
+    # Brief summary to console
     pct = (
         (summary.files_with_lyrics / summary.files_total * 100.0)
         if summary.files_total
