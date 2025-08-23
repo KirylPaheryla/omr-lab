@@ -36,7 +36,9 @@ def _silence_music21_warnings() -> None:
     """
     import warnings
 
-    warnings.filterwarnings("ignore", category=exceptions21.Music21Warning)
+    warning_cls = getattr(exceptions21, "Music21Warning", None)
+    if warning_cls is not None:
+        warnings.filterwarnings("ignore", category=warning_cls)
     warnings.filterwarnings("ignore", module=r"music21\.musicxml\.m21ToXml")
     warnings.filterwarnings("ignore", module=r"music21\.midi")
 
@@ -444,7 +446,8 @@ def _export_one(
             parts = list(json_path.parts)
             if "data" in parts:
                 idx = parts.index("data")
-                rel = Path(*parts[idx + 1 :])
+                # keep the 'data' segment so output mirrors input layout
+                rel = Path(*parts[idx:])
             else:
                 rel = Path(json_path.name)
         except Exception:
