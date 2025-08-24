@@ -31,7 +31,13 @@ OPT_DPI = typer.Option(300, help="Normalize images to this DPI.")
 
 OPT_IMPL = typer.Option(..., help="Implementation: rules|hybrid|ai|baseline")
 OPT_CONFIG = typer.Option(None, help="YAML config for pipeline.")
-ARG_INPUT_PATH = typer.Argument(..., help="Input images folder or file.")
+ARG_INPUT_PATH = typer.Argument(None, help="Input images folder or file.")
+OPT_INPUT_PATH = typer.Option(
+    None,
+    "--input",
+    "-i",
+    help="Input images folder or file (alias of positional INPUT_PATH).",
+)
 OPT_OUT_RUN = typer.Option(
     Path("experiments/runs/run1"), help="Output directory for artifacts."
 )
@@ -386,10 +392,16 @@ def ir_qa(
 def run_pipeline(
     impl: str = OPT_IMPL,
     config: Path | None = OPT_CONFIG,
-    input_path: Path = ARG_INPUT_PATH,
+    input_opt: Path | None = OPT_INPUT_PATH,
+    input_path: Path | None = ARG_INPUT_PATH,
     out: Path = OPT_OUT_RUN,
 ) -> None:
     """Run a recognition pipeline (rules, hybrid, ai, baseline)."""
+
+    effective_input: Path | None = input_opt or input_path
+    if effective_input is None:
+        raise typer.BadParameter("Provide INPUT_PATH (positional) or --input/-i.")
+
     registry = get_registry()
     if impl not in registry:
         raise typer.BadParameter(
@@ -401,18 +413,18 @@ def run_pipeline(
 
     ctx = RunContext.create(impl=impl, run_dir=out)
     log.bind(run_id=ctx.run_id, impl=impl)
-    ctx.write_manifest(inputs=[str(input_path)])
+    ctx.write_manifest(inputs=[str(effective_input)])
     ctx.save_configs(cfg_effective, config)
 
     log.info(
         "run_pipeline_start",
         impl=impl,
         config=str(config) if config else None,
-        input=str(input_path),
+        input=str(effective_input),
         out=str(out),
     )
     out.mkdir(parents=True, exist_ok=True)
-    inputs: list[Path] = [input_path]
+    inputs: list[Path] = [effective_input]
     registry[impl](inputs, out, cfg_obj)
     ctx.finalize(status="ok")
 
