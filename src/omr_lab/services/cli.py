@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import typer
@@ -144,6 +145,18 @@ OPT_RENDER_VEROVIO = typer.Option(
 )
 OPT_RENDER_DPI = typer.Option(
     300, "--dpi", "-r", help="PNG DPI for MuseScore renderer."
+)
+# NEW: parallelism + skip-existing
+OPT_RENDER_JOBS = typer.Option(
+    max(1, (os.cpu_count() or 2) // 2),
+    "--jobs",
+    "-j",
+    help="How many MuseScore exports to run in parallel.",
+)
+OPT_RENDER_SKIP = typer.Option(
+    True,
+    "--skip-existing/--no-skip-existing",
+    help="If a PNG (or paged PNGs) exist and are newer than XML, reuse them.",
 )
 # --------------------------------------------------------------
 
@@ -292,6 +305,8 @@ def data_render(
     musescore_cmd: str | None = OPT_RENDER_MUSESCORE,
     verovio_cmd: str | None = OPT_RENDER_VEROVIO,
     dpi: int = OPT_RENDER_DPI,
+    jobs: int = OPT_RENDER_JOBS,  # NEW
+    skip_existing: bool = OPT_RENDER_SKIP,  # NEW
 ) -> None:
     """
     Render page images (MuseScore) and SVG (Verovio), collect COCO + pages.csv + links.csv.
@@ -309,6 +324,8 @@ def data_render(
         musescore_cmd=musescore_cmd,
         verovio_cmd=verovio_cmd,
         dpi=dpi,
+        jobs=jobs,  # NEW
+        skip_existing=skip_existing,  # NEW
     )
     log.info("render_done", coco=str(coco_path), pages=str(pages_csv))
 

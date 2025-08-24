@@ -31,6 +31,9 @@ experiments/reports/
 data/synth/
 data/annotations/
 data/splits/
+data/render/
+data/images/
+data/annotations_pix/
 
 # Quarantined files
 /data/quarantine/

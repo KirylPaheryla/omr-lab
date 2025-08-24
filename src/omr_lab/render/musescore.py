@@ -23,7 +23,7 @@ def render_png_with_musescore(
     out_png = out_png.resolve()
     out_png.parent.mkdir(parents=True, exist_ok=True)
 
-    cmd: list[str] = [musescore_cmd, "-s"]
+    cmd: list[str] = [musescore_cmd]
     if trim_px and trim_px > 0:
         # Optional: not all versions support -T
         cmd += ["-T", str(trim_px)]
